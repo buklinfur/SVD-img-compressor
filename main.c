@@ -64,10 +64,6 @@ int main (int argc, char **argv) {
     dataToMatrix (matrixB, b, height, width, 1);
     printf ("Making matrices complete.\n\n");
 
-    free (r);
-    free (g);
-    free (b);
-
     printf ("Attempting to apply SVD compression...\n");
     Matrix* resR = svdCompression (matrixR, compressionValue);
     Matrix* resG = svdCompression (matrixG, compressionValue);

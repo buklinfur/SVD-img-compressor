@@ -25,6 +25,12 @@ double* diag (double* A, int row_b, int column_b);
 // get transposed matrix
 void tran(double* A, int row, int column);
 
+// basic A*B*C matrix multiplication? modifyed for svd matrices
+double* getMult (double* U, double* S, double* V, int row, int column, int k);
+
+// resets values outside specified limits
+double* shrinker (double* A, int rows, int cols, int rowsNew, int colsNew);
+
 // get U, S, V matrices ov SVD
 void svd(double* A, double* U, double* S, double* V, int row, int column);
 
