@@ -82,4 +82,21 @@ if(SVDC_BUILD_TESTS)
         svdc_target_setup(${name})
         add_test(NAME ${name} COMMAND ${name})
     endforeach()
+
+    # matrix in, SVD out: used by tests/numpy_check.py
+    add_executable(svd_tool tests/svd_tool.c)
+    target_link_libraries(svd_tool PRIVATE svdcore)
+    svdc_target_setup(svd_tool)
+
+    # optional cross-check against numpy, registered only when numpy is importable
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        execute_process(COMMAND ${Python3_EXECUTABLE} -c "import numpy"
+                        RESULT_VARIABLE SVDC_NUMPY_MISSING OUTPUT_QUIET ERROR_QUIET)
+        if(SVDC_NUMPY_MISSING EQUAL 0)
+            add_test(NAME numpy_check
+                     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/numpy_check.py
+                             --tool $<TARGET_FILE:svd_tool>)
+        endif()
+    endif()
 endif()
