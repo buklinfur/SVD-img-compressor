@@ -11,8 +11,8 @@ a fresh clone builds with one command.
 
 ![original and reconstructions with k = 5, 20, 50](docs/grid.jpg)
 
-*Rank-k approximations of a 400×469 photo, per RGB channel. File sizes:
-k = 5 → 12.9 KiB, k = 20 → 51.7 KiB, k = 50 → 129.1 KiB (raw pixels: 549.6 KiB).*
+*Rank-k approximations of a 735×526 meme, per RGB channel. File sizes:
+k = 5 → 18.7 KiB, k = 20 → 74.6 KiB, k = 50 → 186.5 KiB (raw pixels: 1.11 MiB).*
 
 - Own SVD: Householder QR with column pivoting + one-sided Jacobi rotations
   (the structure of LAPACK's `xGEJSV`), and a randomized range finder with power
@@ -80,7 +80,7 @@ optimum (0.2% on a real image channel, whose spectrum decays quickly).
 `-k N` keeps N triplets per channel. `--energy F` instead picks, per channel,
 the smallest k with σ₁² + … + σ_k² ≥ F·‖A‖²_F; with the randomized solver the
 sketch size doubles until the target is met. Note that for raw pixel intensities
-the first triplet carries the mean brightness, so even k = 1 holds 70–80% of the
+the first triplet carries the mean brightness, so even k = 1 holds ~90% of the
 energy: useful targets are 0.99 and above (see [limitations](#limitations)).
 
 ## Building
@@ -98,7 +98,7 @@ Without CMake: `make` (builds `build-make/svdc`), `make test`, `make OPENMP=1`.
 
 | CMake option | default | effect |
 |---|---|---|
-| `SVDC_OPENMP` | `ON` | compress color channels in parallel if OpenMP is found |
+| `SVDC_OPENMP` | `ON` | compress color channels in parallel if OpenMP is found (not with MSVC, whose OpenMP 2.0 does not work in C11 mode) |
 | `SVDC_WERROR` | `OFF` | treat warnings as errors (used in CI) |
 | `SVDC_SANITIZE` | `OFF` | AddressSanitizer + UndefinedBehaviorSanitizer |
 | `SVDC_NATIVE` | `OFF` | `-march=native` (≈20% faster Jacobi on AVX2 machines) |
@@ -107,26 +107,26 @@ Without CMake: `make` (builds `build-make/svdc`), `make test`, `make OPENMP=1`.
 ## Usage
 
 ```text
-$ svdc compress examples/hopper.png hopper.svdc -k 50
-examples/hopper.png: 400x469, 3 channels -> hopper.svdc
+$ svdc compress examples/test2.png kittens.svdc -k 50
+examples/test2.png: 735x526, 3 channels -> kittens.svdc
   k = 50, 50, 50 (randomized SVD, 8-bit factors)
-  size 129.1 KiB, 4.3x smaller than raw pixels (549.6 KiB), 2.32x vs input file (299.8 KiB)
-  PSNR 27.57 dB, time 0.114 s
+  size 186.5 KiB, 6.1x smaller than raw pixels (1.11 MiB), 1.57x vs input file (292.6 KiB)
+  PSNR 41.23 dB, time 0.149 s
 
-$ svdc decompress hopper.svdc hopper_k50.png
-hopper.svdc -> hopper_k50.png (400x469, 3 channels), 0.033 s
+$ svdc decompress kittens.svdc kittens_k50.png
+kittens.svdc -> kittens_k50.png (735x526, 3 channels), 0.048 s
 
-$ svdc compress examples/hopper.png hopper.svdc --energy 0.99
-  k = 46, 56, 46 (randomized SVD, 8-bit factors)
+$ svdc compress examples/test2.png kittens.svdc --energy 0.99
+  k = 11, 11, 12 (randomized SVD, 8-bit factors)
   ...
 
-$ svdc bench examples/hopper.png --ks 5,20,50,100 --csv results.csv
-examples/hopper.png: 400x469, 3 channels, raw 549.6 KiB, file 299.8 KiB, randomized SVD, 8-bit factors
+$ svdc bench examples/test2.png --ks 5,20,50,100 --csv results.csv
+examples/test2.png: 735x526, 3 channels, raw 1.11 MiB, file 292.6 KiB, randomized SVD, 8-bit factors
      k         size  ratio(raw)  ratio(file)   PSNR dB  compress s  decompress s
-     5     12.9 KiB       42.5x       23.17x     17.06       0.019         0.004
-    20     51.7 KiB       10.6x        5.80x     22.44       0.035         0.008
-    50    129.1 KiB        4.3x        2.32x     27.57       0.094         0.028
-   100    258.1 KiB        2.1x        1.16x     32.86       0.205         0.046
+     5     18.7 KiB       60.6x       15.67x     19.75       0.034         0.011
+    20     74.6 KiB       15.2x        3.92x     28.21       0.095         0.018
+    50    186.5 KiB        6.1x        1.57x     41.23       0.170         0.048
+   100    373.0 KiB        3.0x        0.78x     45.97       0.352         0.093
 ```
 
 The reported PSNR is always measured on what a decoder will produce, i.e. after
@@ -143,30 +143,36 @@ All numbers below are produced by `svdc bench` and
 figures and tables in this README. Machine: 2 vCPU Intel Xeon @ 2.8 GHz,
 gcc 13, `-O3`, no `-march=native`.
 
-**Size and quality vs k** (`examples/hopper.png`, 400×469 RGB, 8-bit factors,
-randomized SVD; raw pixels are 549.6 KiB):
+**Size and quality vs k** (`examples/test2.png`, 735×526 RGB, 8-bit factors,
+randomized SVD; raw pixels are 1.11 MiB, the PNG itself 292.6 KiB):
 
 | k | file size | vs raw | bits/pixel | PSNR, dB | compress, s |
 |--:|--:|--:|--:|--:|--:|
-| 1 | 2.6 KiB | 210.5x | 0.11 | 13.35 | 0.015 |
-| 5 | 12.9 KiB | 42.5x | 0.56 | 17.07 | 0.019 |
-| 10 | 25.8 KiB | 21.3x | 1.13 | 19.53 | 0.022 |
-| 20 | 51.7 KiB | 10.6x | 2.26 | 22.44 | 0.034 |
-| 50 | 129.1 KiB | 4.3x | 5.64 | 27.57 | 0.084 |
-| 100 | 258.1 KiB | 2.1x | 11.27 | 32.86 | 0.205 |
-| 200 | 516.2 KiB | 1.1x | 22.54 | 41.32 | 0.740 |
+| 1 | 3.8 KiB | 301.3x | 0.08 | 13.81 | 0.027 |
+| 5 | 18.7 KiB | 60.6x | 0.40 | 19.75 | 0.032 |
+| 10 | 37.3 KiB | 30.3x | 0.79 | 23.41 | 0.041 |
+| 20 | 74.6 KiB | 15.2x | 1.58 | 28.21 | 0.069 |
+| 30 | 111.9 KiB | 10.1x | 2.37 | 32.88 | 0.094 |
+| 50 | 186.5 KiB | 6.1x | 3.95 | 41.23 | 0.148 |
+| 100 | 373.0 KiB | 3.0x | 7.90 | 45.97 | 0.350 |
+| 200 | 745.9 KiB | 1.5x | 15.81 | 48.50 | 1.130 |
 
 ![PSNR vs bits per pixel for svdc and JPEG](docs/rate_distortion.png)
 
 **Honest comparison with JPEG.** At equal size JPEG is far better: it reaches
-~29 dB at 0.5 bits per pixel, while the SVD codec needs ~6 bits per pixel for
+41 dB at 0.5 bits per pixel, while the SVD codec needs ~4 bits per pixel for
 the same quality. This is expected and is the main lesson of the project: a
-truncated SVD is the *optimal low-rank* approximation, but natural images are
-not low-rank. Their singular values decay slowly (below), and fine detail costs
-whole rank-one layers spanning the full image, while JPEG spends bits locally
-(8×8 DCT blocks), exploits human perception (chroma subsampling, quantization
-tables) and entropy-codes the result. Here 8-bit factors beat 16-bit ones at
-every size, because quantization noise is much smaller than the truncation error.
+truncated SVD is the *optimal low-rank* approximation, but images are not
+low-rank in general. Fine detail costs whole rank-one layers spanning the full
+image, while JPEG spends bits locally (8×8 DCT blocks), exploits human
+perception (chroma subsampling, quantization tables) and entropy-codes the result.
+
+This particular image is friendlier to SVD than a typical photo: the spectrum
+below has a sharp knee near i ≈ 80 (the meme looks like an upscaled
+low-resolution picture, so its effective rank is small), which is why PSNR jumps
+from 33 dB at k = 30 to 41 dB at k = 50. Past that point the 8-bit factors hit
+their quantization ceiling (~49 dB), and from k ≈ 150 on the 16-bit factors
+give better quality per byte; below it 8 bits are always the better choice.
 
 ![singular values and captured energy per channel](docs/spectrum.png)
 
@@ -179,9 +185,9 @@ every size, because quantization noise is much smaller than the truncation error
 | Jacobi (exact, all 868 triplets) | 21.0 s | 14.5 s |
 
 Three channels on two cores bound the channel-level speedup at 1.5× for the
-compute-bound Jacobi solver. The randomized solver loses at most 0.15 dB of
-PSNR against the exact one (hopper.png, k = 5…200; the exact SVD of that image
-takes 1.0 s, the randomized one 0.02–0.65 s depending on k).
+compute-bound Jacobi solver. The randomized solver loses at most 0.05 dB of
+PSNR against the exact one (test2.png, k = 5…200; the exact SVD of all three
+channels takes 2.5 s, the randomized one 0.03–1.1 s depending on k).
 
 **Accuracy** (`tests/numpy_check.py`, run in CI): the Jacobi SVD matches
 `numpy.linalg.svd` with max |σᵢ − σᵢ^np| / σ₁ ≤ 6e-14,
@@ -263,5 +269,5 @@ and only worked for square PNG images. That version is kept unchanged on the
 ## License
 
 MIT, see [LICENSE](LICENSE). stb is MIT / public domain
-([third_party/stb/LICENSE](third_party/stb/LICENSE)). Image credits are in
-[examples/README.md](examples/README.md).
+([third_party/stb/LICENSE](third_party/stb/LICENSE)). The example images are
+listed in [examples/README.md](examples/README.md).

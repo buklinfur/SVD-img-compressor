@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate the README figures and tables from a real svdc run.
 
-usage: python3 scripts/make_figures.py [--svdc build/svdc] [--image examples/hopper.png]
+usage: python3 scripts/make_figures.py [--svdc build/svdc] [--image examples/test2.png]
 
 Writes into docs/:
   grid.jpg              original next to reconstructions at k = 5, 20, 50
@@ -25,7 +25,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from PIL import Image, ImageDraw  # noqa: E402
+from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
 KS = [1, 2, 5, 10, 20, 30, 50, 75, 100, 150, 200, 300]
 GRID_KS = [5, 20, 50]
@@ -76,15 +76,19 @@ def make_grid(original, prefix, path):
         tiles.append(("k = %d" % k, Image.open("%s_k%d.png" % (prefix, k)).convert("RGB")))
     h = 360
     scaled = [(name, im.resize((round(im.width * h / im.height), h), Image.LANCZOS)) for name, im in tiles]
-    gap, label = 8, 28
+    gap, label = 8, 30
     width = sum(im.width for _, im in scaled) + gap * (len(scaled) - 1)
     canvas = Image.new("RGB", (width, h + label), "white")
     draw = ImageDraw.Draw(canvas)
+    try:
+        font = ImageFont.load_default(size=18)  # Pillow >= 10.1
+    except TypeError:
+        font = ImageFont.load_default()
     x = 0
     for name, im in scaled:
         canvas.paste(im, (x, label))
-        tw = draw.textlength(name)
-        draw.text((x + (im.width - tw) / 2, 8), name, fill=INK)
+        tw = draw.textlength(name, font=font)
+        draw.text((x + (im.width - tw) / 2, 4), name, fill=INK, font=font)
         x += im.width + gap
     canvas.save(path, quality=92)
 
@@ -92,7 +96,7 @@ def make_grid(original, prefix, path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--svdc", default="build/svdc")
-    parser.add_argument("--image", default="examples/hopper.png")
+    parser.add_argument("--image", default="examples/test2.png")
     parser.add_argument("--out", default="docs")
     args = parser.parse_args()
     os.makedirs(args.out, exist_ok=True)
