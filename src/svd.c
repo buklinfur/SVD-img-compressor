@@ -26,7 +26,9 @@ void freeSvd (Svd* svd) {
     free (svd);
 }
 
-static Svd* allocSvd (int rows, int cols, int rank) {
+Svd* makeSvd (int rows, int cols, int rank) {
+    if (rank <= 0)
+        return NULL;
     Svd* svd = (Svd*) calloc (1, sizeof (Svd));
     if (svd == NULL)
         return NULL;
@@ -294,7 +296,7 @@ Svd* svdJacobi (const Matrix* a, int k, int maxSweeps, JacobiStats* stats) {
     int* perm = (int*) malloc ((size_t) nw * sizeof (int));
     double* z = (double*) malloc ((size_t) mw * sizeof (double));
     SortItem* order = (SortItem*) malloc ((size_t) nw * sizeof (SortItem));
-    Svd* svd = allocSvd (m, n, k);
+    Svd* svd = makeSvd (m, n, k);
     Svd* result = NULL;
     if (w == NULL || x == NULL || vx == NULL || vDiag == NULL || beta == NULL ||
         norms == NULL || perm == NULL || z == NULL || order == NULL || svd == NULL)

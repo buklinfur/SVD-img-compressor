@@ -60,28 +60,92 @@ include(CheckLibraryExists)
 check_library_exists(m sqrt "" SVDC_HAVE_LIBM)
 
 # ---------------------------------------------------------------------------
+# vendored stb: compiled in its own object library without our warning flags
+
+add_library(svdc_stb OBJECT src/stb_impl.c)
+target_include_directories(svdc_stb SYSTEM PUBLIC third_party/stb)
+if(MSVC)
+    target_compile_options(svdc_stb PRIVATE /w)
+    target_compile_definitions(svdc_stb PRIVATE _CRT_SECURE_NO_WARNINGS)
+else()
+    target_compile_options(svdc_stb PRIVATE -w)
+endif()
+set_target_properties(svdc_stb PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# ---------------------------------------------------------------------------
 # core library
 
 add_library(svdcore STATIC
     src/matrix.c
-    src/svd.c)
+    src/svd.c
+    src/image.c
+    src/codec.c
+    src/metrics.c
+    $<TARGET_OBJECTS:svdc_stb>)
 target_include_directories(svdcore PUBLIC src)
+target_include_directories(svdcore SYSTEM PUBLIC third_party/stb)
 svdc_target_setup(svdcore)
 if(SVDC_HAVE_LIBM)
     target_link_libraries(svdcore PUBLIC m)
 endif()
+
+if(SVDC_OPENMP)
+    find_package(OpenMP COMPONENTS C)
+    if(OpenMP_C_FOUND)
+        target_link_libraries(svdcore PUBLIC OpenMP::OpenMP_C)
+        message(STATUS "svdc: OpenMP enabled")
+    else()
+        message(STATUS "svdc: OpenMP not found, channels are processed sequentially")
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# command line tool
+
+add_executable(svdc src/main.c)
+target_link_libraries(svdc PRIVATE svdcore)
+target_compile_definitions(svdc PRIVATE SVDC_VERSION_STRING="${PROJECT_VERSION}")
+svdc_target_setup(svdc)
+
+include(GNUInstallDirs)
+install(TARGETS svdc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # ---------------------------------------------------------------------------
 # tests
 
 if(SVDC_BUILD_TESTS)
     enable_testing()
-    foreach(name test_svd)
+    foreach(name test_svd test_codec)
         add_executable(${name} tests/${name}.c)
         target_link_libraries(${name} PRIVATE svdcore)
+        target_compile_definitions(${name} PRIVATE EXAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/examples")
         svdc_target_setup(${name})
         add_test(NAME ${name} COMMAND ${name})
     endforeach()
+
+    # end-to-end tests of the command line tool
+    set(EX ${CMAKE_CURRENT_SOURCE_DIR}/examples)
+    set(OUT ${CMAKE_CURRENT_BINARY_DIR}/cli-test)
+    file(MAKE_DIRECTORY ${OUT})
+    add_test(NAME cli_compress_rgba COMMAND svdc compress ${EX}/test3.png ${OUT}/rgba.svdc -k 30)
+    add_test(NAME cli_decompress_rgba COMMAND svdc decompress ${OUT}/rgba.svdc ${OUT}/rgba.png)
+    add_test(NAME cli_compress_jpeg_energy COMMAND svdc compress ${EX}/img.jpg ${OUT}/jpeg.svdc --energy 0.99 --bits 16 -q)
+    add_test(NAME cli_decompress_to_jpeg COMMAND svdc decompress ${OUT}/jpeg.svdc ${OUT}/jpeg.jpg -q)
+    add_test(NAME cli_info COMMAND svdc info ${OUT}/rgba.svdc)
+    add_test(NAME cli_jacobi COMMAND svdc compress ${EX}/test.png ${OUT}/small.svdc --method jacobi -k 100)
+    add_test(NAME cli_bench COMMAND svdc bench ${EX}/test.png --ks 1,10,40 --csv ${OUT}/bench.csv)
+    set_tests_properties(cli_compress_rgba PROPERTIES FIXTURES_SETUP rgba)
+    set_tests_properties(cli_decompress_rgba cli_info PROPERTIES FIXTURES_REQUIRED rgba)
+    set_tests_properties(cli_compress_jpeg_energy PROPERTIES FIXTURES_SETUP jpeg)
+    set_tests_properties(cli_decompress_to_jpeg PROPERTIES FIXTURES_REQUIRED jpeg)
+
+    # these must fail cleanly (non-zero exit, no crash)
+    add_test(NAME cli_rejects_non_svdc COMMAND svdc decompress ${EX}/test.png ${OUT}/x.png)
+    add_test(NAME cli_rejects_missing_file COMMAND svdc compress ${EX}/missing.png ${OUT}/x.svdc)
+    add_test(NAME cli_rejects_bad_k COMMAND svdc compress ${EX}/test.png ${OUT}/x.svdc -k 0)
+    add_test(NAME cli_rejects_k_and_energy COMMAND svdc compress ${EX}/test.png ${OUT}/x.svdc -k 5 --energy 0.9)
+    set_tests_properties(cli_rejects_non_svdc cli_rejects_missing_file cli_rejects_bad_k
+                         cli_rejects_k_and_energy PROPERTIES WILL_FAIL TRUE)
 
     # matrix in, SVD out: used by tests/numpy_check.py
     add_executable(svd_tool tests/svd_tool.c)

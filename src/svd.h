@@ -66,6 +66,9 @@ int truncateSvd (Svd* svd, int k);
 // U_k * diag (s_k) * V_k^T for the first k triplets (k <= 0 means all), O(m n k)
 Matrix* svdReconstruct (const Svd* svd, int k);
 
+// zero-filled rows x cols decomposition with `rank` triplets, NULL on failure
+Svd* makeSvd (int rows, int cols, int rank);
+
 void freeSvd (Svd* svd);
 
 #endif
