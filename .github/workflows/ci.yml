@@ -35,7 +35,13 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSVDC_WERROR=${{ matrix.werror }}
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        shell: bash
+        run: cmake --build build --config Release --parallel 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+
+      - name: Report compiler errors as annotations
+        if: failure()
+        shell: bash
+        run: grep -iE "error|warning" build.log | head -50 | sed 's/^/::error::/' || true
 
       - name: Test
         run: ctest --test-dir build --build-config Release --output-on-failure

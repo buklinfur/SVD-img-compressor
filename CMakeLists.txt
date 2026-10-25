@@ -94,7 +94,10 @@ if(SVDC_HAVE_LIBM)
     target_link_libraries(svdcore PUBLIC m)
 endif()
 
-if(SVDC_OPENMP)
+if(SVDC_OPENMP AND MSVC)
+    # MSVC's /openmp (OpenMP 2.0) cannot be combined with /std:c11
+    message(STATUS "svdc: OpenMP is not used with MSVC in C11 mode, channels are processed sequentially")
+elseif(SVDC_OPENMP)
     find_package(OpenMP COMPONENTS C)
     if(OpenMP_C_FOUND)
         target_link_libraries(svdcore PUBLIC OpenMP::OpenMP_C)
