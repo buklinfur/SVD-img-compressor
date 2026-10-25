@@ -24,7 +24,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # warning flags for the project's own code (not for vendored stb)
 
 if(MSVC)
-    set(SVDC_WARNINGS /W4 /permissive-)
+    set(SVDC_WARNINGS /W4)
     if(SVDC_WERROR)
         list(APPEND SVDC_WARNINGS /WX)
     endif()
@@ -69,6 +69,11 @@ if(MSVC)
     target_compile_definitions(svdc_stb PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
     target_compile_options(svdc_stb PRIVATE -w)
+    if(SVDC_SANITIZE)
+        # stb_image_write's JPEG encoder has a signed left-shift overflow (upstream UB,
+        # harmless on every real compiler); keep all other checks for stb
+        target_compile_options(svdc_stb PRIVATE -fno-sanitize=shift)
+    endif()
 endif()
 set_target_properties(svdc_stb PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

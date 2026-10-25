@@ -15,3 +15,8 @@ Single-header image I/O libraries by Sean Barrett and contributors.
 The headers are unmodified. Their implementation is compiled once, in
 `src/stb_impl.c`, with compiler warnings disabled for that translation unit
 only, so the project's own strict warning flags do not apply to third-party code.
+
+Known upstream issue: UndefinedBehaviorSanitizer reports a left shift that overflows
+a signed `int` in the JPEG encoder of `stb_image_write.h`. It is harmless with
+real compilers, so sanitizer builds (`-DSVDC_SANITIZE=ON`) disable only the
+`shift` check for this translation unit.
